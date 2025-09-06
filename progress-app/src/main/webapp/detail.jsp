@@ -1,4 +1,4 @@
-<%@ page contentType="text/html; charset=UTF-8" %>
+<%@ page pageEncoding="UTF-8" contentType="text/html; charset=UTF-8" %>
 <%@ taglib prefix="c"  uri="http://java.sun.com/jsp/jstl/core" %>
 <!doctype html>
 <html>
@@ -66,7 +66,7 @@
   </table>
 
   <h3>メモ追加</h3>
-  <form method="post" action="">
+  <form method="post" action="" accept-charset="UTF-8">
     <input type="hidden" name="action" value="add_memo" />
     <label>種別:
       <select name="type">

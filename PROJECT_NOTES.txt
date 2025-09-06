@@ -2,56 +2,92 @@ Project Notes (進捗管理アプリ)
 
 概要
 - 小規模チーム向けの「クラス別の進捗とメモ（note/bug）管理」Webアプリ。
-- ポートフォリオ掲載を主目的。まずはシンプルな in-memory 実装で動作確認を重視。
+- 当面はシンプルな機能で動くことを重視し、JDBCによる永続化に対応。
 
 技術スタック
-- Java 17 / Servlet 4.0（`javax.*`）
+- Java 17 / Servlet 4.0（javax.*）
 - JSP + JSTL 1.2
-- Maven（`war` パッケージ）/ Tomcat 9 想定
+- Maven（WAR）/ Tomcat 9
+- DB: MariaDB/MySQL（HeidiSQL で管理）
 
 モジュール/構成
-- モジュール: `progress-app`（WAR）
-- 主要ディレクトリ:
-  - `src/main/java/com/example/progress/model`: `ClassEntry`, `Memo`
-  - `src/main/java/com/example/progress/repository`: `InMemoryStore`
-  - `src/main/java/com/example/progress/web`: `ClassListServlet`（一覧）, `ClassDetailServlet`（詳細/POST処理）
-  - `src/main/webapp`: `index.jsp`, `list.jsp`, `detail.jsp`, `WEB-INF/web.xml`
-- サーブレットは `@WebServlet` によるアノテーションマッピング。`web.xml` は最小限（welcome-file のみ）。
+- モジュール: progress-app（WAR）
+- パッケージ:
+  - model: ClassEntry, Memo
+  - repository: InMemoryStore（メモリ実装）, JdbcStore（JDBC実装）, SchemaMissingException
+  - web: ClassListServlet（一覧）, ClassDetailServlet（詳細/POST）, CharsetFilter（UTF-8）
+- Web資産: index.jsp, list.jsp, detail.jsp, WEB-INF/web.xml, META-INF/context.xml（JNDI定義）
 
-現在の機能
-- クラス一覧（`GET /classes`）
-  - パッケージ名→クラス名の順にソートして表示。
-  - ステータス（todo/doing/done）と進捗（%）を表示。
-  - 進捗セレクトはプレースホルダ（値送信や更新は未実装）。
-- クラス詳細（`GET /classes/{id}`）
-  - 該当クラス情報とメモ一覧（note/bug）を表示。
-  - メモの追加（`POST /classes/{id}` with `action=add_memo`）。
-  - メモのクローズ（`POST /classes/{id}` with `action=close_memo`）。
-- データストア
-  - `InMemoryStore` によるインメモリ保持。アプリ初回アクセス時にシードデータ投入。
-  - `ServletContext` に単一インスタンスを格納し、同一アプリ内で共有。
+データベース
+- 代表的スキーマ（実運用中）
+  - DB名: taskall（環境により変更可）
+  - テーブル: classes, memos（DDL は下記）
+- JNDI DataSource（ローカル例: META-INF/context.xml）
+  - name: jdbc/progress
+  - url: jdbc:mariadb://localhost:3306/taskall?useUnicode=true&amp;characterEncoding=utf8&amp;serverTimezone=UTC
+  - username/password: 環境に合わせて設定（例: progress/progresspw）
+- web.xml に resource-ref を定義済み（jdbc/progress）。
 
-主要エンドポイント
-- `GET /classes` → 一覧（`list.jsp` へフォワード）
-- `GET /classes/{id}` → 詳細（`detail.jsp` へフォワード）
-- `POST /classes/{id}` → `action=add_memo` | `action=close_memo`
+実装済み機能
+- クラス一覧（GET /classes）
+  - パッケージ名→クラス名でソートし、ID/パッケージ/クラス名/作成者/ステータス/進捗(%) を表示。
+  - DB接続（JNDI）成功時は JDBC 経由で取得。JNDI未設定時はメモリにフォールバック。
+  - テーブル未作成/権限不足に相当する場合、一覧上部に警告を表示。
+- クラス詳細（GET /classes/{id}）
+  - クラス情報とメモ一覧（note/bug）を表示。
+  - メモ追加（POST /classes/{id}、action=add_memo）: severity が空なら NULL 保存。
+  - メモクローズ（POST /classes/{id}、action=close_memo）。
+- 文字コード対策: CharsetFilter を導入し、JSP は pageEncoding=UTF-8。フォームには accept-charset を付与。
 
-ビルド/実行
-- 依存取得と WAR 作成: `mvn -q -DskipTests package`
-- 生成物: `target/progress-app-0.0.1-SNAPSHOT.war`
-- デプロイ: Tomcat の `webapps/` へ配置
-- 既定アクセス例: `http://localhost:8080/progress-app/classes`（コンテキストパスは配置名に依存）
+未実装/今後の拡張
+- 進捗更新（一覧のセレクトから progress を更新、last_updated も更新）。
+- クラスの追加/編集/削除 UI。
+- 入力バリデーションとエラー表示（メモ/クラス）。
+- バグ件数表示（countOpenBugs の UI 反映）。
+- SLF4J バインダの追加（警告抑止、例: slf4j-jdk14）。
+- Jakarta EE 版への将来移行（javax.* → jakarta.*）。
+- 単体テスト/簡易ITの追加。
 
-今後の TODO（優先度順の目安）
-- 進捗更新の実装（一覧のセレクト値送信→更新→表示反映）
-- 入力バリデーション（メモの必須項目、長さなど）
-- 編集/削除（メモ/クラス）UI とハンドラ追加
-- 文字化けの洗い出しと UTF-8 一貫化（JSP/meta・JSTL・ソース内文字列・コンテナ設定）
-- 永続化層（当面 H2/SQLite）導入検討（JDBC もしくは JPA）
-- 一覧/詳細でのバグ件数表示（`countOpenBugs` の UI 反映）
-- 簡易デザイン調整（強調色、視認性、モバイル対応）
-- テスト整備（リポジトリの単体テスト、サーブレットの最小 IT）
+ビルド/デプロイ
+- Maven: mvn -q -DskipTests package → target/progress-app-0.0.1-SNAPSHOT.war
+- Tomcat への配置（手動）: webapps へ WAR を配置（再配備時は展開済みフォルダを削除）。
+- Eclipse（WTP）での配備:
+  - Server Locations: Use workspace metadata（推奨）。
+  - Servers ビューで Clean → Publish → Start/Restart。
+  - Modules の Path が progress-app なら URL は http://localhost:8080/progress-app/（ROOT配備時は http://localhost:8080/）。
+  - 配備先（例）: ＜workspace＞/.metadata/.plugins/org.eclipse.wst.server.core/tmpX/wtpwebapps/progress-app
 
-注意事項
-- Servlet API は `provided` 依存（コンテナ提供）。JSTL 1.2 を明示依存で利用中。
-- 将来的に Jakarta EE 版へ移行する場合は `jakarta.*` へのパッケージ移行と依存の差し替えが必要。
+DBスキーマ（DDL）
+CREATE TABLE classes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  package_name VARCHAR(255) NOT NULL,
+  class_name   VARCHAR(255) NOT NULL,
+  author       VARCHAR(100) NOT NULL,
+  status       ENUM('todo','doing','done') NOT NULL DEFAULT 'todo',
+  progress     TINYINT NOT NULL DEFAULT 0,
+  last_updated DATE NOT NULL,
+  UNIQUE KEY uq_class (package_name, class_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE memos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  class_id   INT NOT NULL,
+  type       ENUM('note','bug') NOT NULL,
+  title      VARCHAR(255) NOT NULL,
+  body       TEXT,
+  severity   ENUM('low','mid','high') NULL,
+  created_by VARCHAR(100),
+  created_at DATETIME NOT NULL,
+  status     ENUM('open','closed') NOT NULL DEFAULT 'open',
+  CONSTRAINT fk_memo_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  KEY idx_memos_class_status (class_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+既知の注意点
+- 最初に DB 接続が権限不足/テーブル未作成だと一覧に警告を出す（SchemaMissingException を捕捉）。
+- SLF4J: 「No providers」警告は機能影響なし。必要なら slf4j-jdk14 追加で抑止可能。
+- Eclipse で「複数のコンテキストに '/progress-app'」が出る場合は、重複配備（インストール側/ワークスペース側）を整理し、Clean/Publish で再配備。
+
+メモ
+- 現在は DB: taskall（JNDI で jdbc/progress を参照）。環境により DB 名/資格情報は変更可。
+- URL の & は context.xml 内では &amp; にエスケープすること。

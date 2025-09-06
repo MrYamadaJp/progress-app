@@ -1,4 +1,4 @@
-<%@ page contentType="text/html; charset=UTF-8" %>
+<%@ page pageEncoding="UTF-8" contentType="text/html; charset=UTF-8" %>
 <!doctype html>
 <html>
 <head><meta charset="UTF-8"><title>Progress App</title></head>
