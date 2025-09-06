@@ -1,0 +1,57 @@
+Project Notes (進捗管理アプリ)
+
+概要
+- 小規模チーム向けの「クラス別の進捗とメモ（note/bug）管理」Webアプリ。
+- ポートフォリオ掲載を主目的。まずはシンプルな in-memory 実装で動作確認を重視。
+
+技術スタック
+- Java 17 / Servlet 4.0（`javax.*`）
+- JSP + JSTL 1.2
+- Maven（`war` パッケージ）/ Tomcat 9 想定
+
+モジュール/構成
+- モジュール: `progress-app`（WAR）
+- 主要ディレクトリ:
+  - `src/main/java/com/example/progress/model`: `ClassEntry`, `Memo`
+  - `src/main/java/com/example/progress/repository`: `InMemoryStore`
+  - `src/main/java/com/example/progress/web`: `ClassListServlet`（一覧）, `ClassDetailServlet`（詳細/POST処理）
+  - `src/main/webapp`: `index.jsp`, `list.jsp`, `detail.jsp`, `WEB-INF/web.xml`
+- サーブレットは `@WebServlet` によるアノテーションマッピング。`web.xml` は最小限（welcome-file のみ）。
+
+現在の機能
+- クラス一覧（`GET /classes`）
+  - パッケージ名→クラス名の順にソートして表示。
+  - ステータス（todo/doing/done）と進捗（%）を表示。
+  - 進捗セレクトはプレースホルダ（値送信や更新は未実装）。
+- クラス詳細（`GET /classes/{id}`）
+  - 該当クラス情報とメモ一覧（note/bug）を表示。
+  - メモの追加（`POST /classes/{id}` with `action=add_memo`）。
+  - メモのクローズ（`POST /classes/{id}` with `action=close_memo`）。
+- データストア
+  - `InMemoryStore` によるインメモリ保持。アプリ初回アクセス時にシードデータ投入。
+  - `ServletContext` に単一インスタンスを格納し、同一アプリ内で共有。
+
+主要エンドポイント
+- `GET /classes` → 一覧（`list.jsp` へフォワード）
+- `GET /classes/{id}` → 詳細（`detail.jsp` へフォワード）
+- `POST /classes/{id}` → `action=add_memo` | `action=close_memo`
+
+ビルド/実行
+- 依存取得と WAR 作成: `mvn -q -DskipTests package`
+- 生成物: `target/progress-app-0.0.1-SNAPSHOT.war`
+- デプロイ: Tomcat の `webapps/` へ配置
+- 既定アクセス例: `http://localhost:8080/progress-app/classes`（コンテキストパスは配置名に依存）
+
+今後の TODO（優先度順の目安）
+- 進捗更新の実装（一覧のセレクト値送信→更新→表示反映）
+- 入力バリデーション（メモの必須項目、長さなど）
+- 編集/削除（メモ/クラス）UI とハンドラ追加
+- 文字化けの洗い出しと UTF-8 一貫化（JSP/meta・JSTL・ソース内文字列・コンテナ設定）
+- 永続化層（当面 H2/SQLite）導入検討（JDBC もしくは JPA）
+- 一覧/詳細でのバグ件数表示（`countOpenBugs` の UI 反映）
+- 簡易デザイン調整（強調色、視認性、モバイル対応）
+- テスト整備（リポジトリの単体テスト、サーブレットの最小 IT）
+
+注意事項
+- Servlet API は `provided` 依存（コンテナ提供）。JSTL 1.2 を明示依存で利用中。
+- 将来的に Jakarta EE 版へ移行する場合は `jakarta.*` へのパッケージ移行と依存の差し替えが必要。
