@@ -5,212 +5,248 @@ import com.example.progress.model.Memo;
 
 import javax.sql.DataSource;
 import java.sql.*;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 public class JdbcStore {
   private final DataSource dataSource;
 
-  public JdbcStore(DataSource dataSource) {
-    this.dataSource = dataSource;
-  }
+  public JdbcStore(DataSource dataSource) { this.dataSource = dataSource; }
 
   public boolean isSchemaReady() {
     try (Connection c = dataSource.getConnection()) {
       try (PreparedStatement ps = c.prepareStatement("SELECT 1 FROM classes LIMIT 1")) { ps.executeQuery(); }
       try (PreparedStatement ps = c.prepareStatement("SELECT 1 FROM memos LIMIT 1")) { ps.executeQuery(); }
       return true;
-    } catch (SQLException e) {
-      if (isTableMissing(e)) return false;
-      return false;
-    }
+    } catch (SQLException e) { return false; }
   }
 
+  // classes
   public List<ClassEntry> listClasses() {
-    String sql = "SELECT id, package_name, class_name, author, status, progress, last_updated FROM classes";
+    String sql = "SELECT class_id, class_name, class_created, status FROM classes";
     List<ClassEntry> list = new ArrayList<>();
-    try (Connection c = dataSource.getConnection();
-         PreparedStatement ps = c.prepareStatement(sql);
-         ResultSet rs = ps.executeQuery()) {
-      while (rs.next()) {
-        list.add(mapClass(rs));
-      }
-    } catch (SQLException e) {
-      if (isTableMissing(e)) throw new SchemaMissingException(e);
-      throw new RuntimeException(e);
-    }
+    try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+      while (rs.next()) list.add(mapClass(rs));
+    } catch (SQLException e) { if (isTableMissing(e)) throw new SchemaMissingException(e); throw new RuntimeException(e); }
     return list;
   }
 
   public List<ClassEntry> listClassesSorted() {
-    String sql = "SELECT id, package_name, class_name, author, status, progress, last_updated " +
-                 "FROM classes ORDER BY package_name, class_name";
+    String sql = "SELECT class_id, class_name, class_created, status FROM classes ORDER BY class_name";
     List<ClassEntry> list = new ArrayList<>();
-    try (Connection c = dataSource.getConnection();
-         PreparedStatement ps = c.prepareStatement(sql);
-         ResultSet rs = ps.executeQuery()) {
-      while (rs.next()) {
-        list.add(mapClass(rs));
-      }
-    } catch (SQLException e) {
-      if (isTableMissing(e)) throw new SchemaMissingException(e);
-      throw new RuntimeException(e);
-    }
+    try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+      while (rs.next()) list.add(mapClass(rs));
+    } catch (SQLException e) { if (isTableMissing(e)) throw new SchemaMissingException(e); throw new RuntimeException(e); }
     return list;
   }
 
   public ClassEntry findClass(int id) {
-    String sql = "SELECT id, package_name, class_name, author, status, progress, last_updated FROM classes WHERE id=?";
-    try (Connection c = dataSource.getConnection();
-         PreparedStatement ps = c.prepareStatement(sql)) {
+    String sql = "SELECT class_id, class_name, class_created, status FROM classes WHERE class_id=?";
+    try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
       ps.setInt(1, id);
-      try (ResultSet rs = ps.executeQuery()) {
-        if (rs.next()) return mapClass(rs);
-        return null;
-      }
-    } catch (SQLException e) {
-      if (isTableMissing(e)) throw new SchemaMissingException(e);
-      throw new RuntimeException(e);
-    }
+      try (ResultSet rs = ps.executeQuery()) { if (rs.next()) return mapClass(rs); return null; }
+    } catch (SQLException e) { if (isTableMissing(e)) throw new SchemaMissingException(e); throw new RuntimeException(e); }
   }
 
   public ClassEntry addClass(ClassEntry entry) {
-    String sql = "INSERT INTO classes(package_name, class_name, author, status, progress, last_updated) " +
-                 "VALUES(?,?,?,?,?,?)";
-    LocalDate last = entry.getLastUpdated() != null ? entry.getLastUpdated() : LocalDate.now();
-    try (Connection c = dataSource.getConnection();
-         PreparedStatement ps = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-      ps.setString(1, entry.getPackageName());
-      ps.setString(2, entry.getClassName());
-      ps.setString(3, entry.getAuthor());
-      ps.setString(4, entry.getStatus());
-      ps.setInt(5, entry.getProgress());
-      ps.setDate(6, Date.valueOf(last));
+    String sql = "INSERT INTO classes(class_name, class_created, status) VALUES(?,?,?)";
+    try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+      ps.setString(1, entry.getClassName());
+      ps.setString(2, entry.getClassCreated());
+      ps.setString(3, entry.getStatus());
       ps.executeUpdate();
-      try (ResultSet keys = ps.getGeneratedKeys()) {
-        if (keys.next()) entry.setId(keys.getInt(1));
-      }
-      entry.setLastUpdated(last);
+      try (ResultSet keys = ps.getGeneratedKeys()) { if (keys.next()) entry.setId(keys.getInt(1)); }
       return entry;
-    } catch (SQLException e) {
-      if (isTableMissing(e)) throw new SchemaMissingException(e);
-      throw new RuntimeException(e);
-    }
+    } catch (SQLException e) { if (isTableMissing(e)) throw new SchemaMissingException(e); throw new RuntimeException(e); }
   }
 
+  public boolean updateClass(ClassEntry entry) {
+    String sql = "UPDATE classes SET class_name=?, class_created=?, status=? WHERE class_id=?";
+    try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+      ps.setString(1, entry.getClassName());
+      ps.setString(2, entry.getClassCreated());
+      ps.setString(3, entry.getStatus());
+      ps.setInt(4, entry.getId());
+      return ps.executeUpdate() > 0;
+    } catch (SQLException e) { if (isTableMissing(e)) throw new SchemaMissingException(e); throw new RuntimeException(e); }
+  }
+
+  public boolean deleteClass(int id) {
+    String sql = "DELETE FROM classes WHERE class_id=?";
+    try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+      ps.setInt(1, id);
+      return ps.executeUpdate() > 0;
+    } catch (SQLException e) { if (isTableMissing(e)) throw new SchemaMissingException(e); throw new RuntimeException(e); }
+  }
+
+  // memos (independent)
   public List<Memo> listMemos(int classId) {
-    String sql = "SELECT id, class_id, type, title, body, severity, created_by, created_at, status " +
-                 "FROM memos WHERE class_id=? ORDER BY id";
+    String sql = "SELECT m.memo_id, m.memo_type, m.memo_title, m.memo_created, m.memo_detail " +
+                 "FROM memos m JOIN class_memo cm ON cm.memo_id = m.memo_id " +
+                 "WHERE cm.class_id = ? ORDER BY m.memo_id";
     List<Memo> list = new ArrayList<>();
-    try (Connection c = dataSource.getConnection();
-         PreparedStatement ps = c.prepareStatement(sql)) {
+    try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
       ps.setInt(1, classId);
       try (ResultSet rs = ps.executeQuery()) {
-        while (rs.next()) list.add(mapMemo(rs));
+        while (rs.next()) list.add(mapMemo(rs, true));
+        return list;
       }
     } catch (SQLException e) {
-      if (isTableMissing(e)) throw new SchemaMissingException(e);
+      if (isColumnMissing(e)) {
+        // fallback for older schema w/o memo_detail
+        String old = "SELECT m.memo_id, m.memo_type, m.memo_title, m.memo_created " +
+                     "FROM memos m JOIN class_memo cm ON cm.memo_id = m.memo_id WHERE cm.class_id = ? ORDER BY m.memo_id";
+        try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(old)) {
+          ps.setInt(1, classId);
+          try (ResultSet rs = ps.executeQuery()) { while (rs.next()) list.add(mapMemo(rs, false)); return list; }
+        } catch (SQLException ex) { if (isTableMissing(ex)) throw new SchemaMissingException(ex); throw new RuntimeException(ex); }
+      }
+      if (isTableMissing(e)) {
+        // If class_memo is missing, fallback to all memos to avoid hard break
+        String all = "SELECT memo_id, memo_type, memo_title, memo_created FROM memos ORDER BY memo_id";
+        try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(all); ResultSet rs = ps.executeQuery()) {
+          while (rs.next()) list.add(mapMemo(rs, false));
+          return list;
+        } catch (SQLException ex) { throw new RuntimeException(ex); }
+      }
       throw new RuntimeException(e);
     }
-    return list;
   }
 
   public Memo addMemo(int classId, Memo memo) {
-    String sql = "INSERT INTO memos(class_id, type, title, body, severity, created_by, created_at, status) " +
-                 "VALUES(?,?,?,?,?,?,?,?)";
-    LocalDateTime ts = memo.getCreatedAt() != null ? memo.getCreatedAt() : LocalDateTime.now();
-    try (Connection c = dataSource.getConnection();
-         PreparedStatement ps = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-      ps.setInt(1, classId);
-      ps.setString(2, memo.getType());
-      ps.setString(3, memo.getTitle());
-      ps.setString(4, memo.getBody());
-      String sev = memo.getSeverity();
-      if (sev == null || sev.trim().isEmpty()) {
-        ps.setNull(5, Types.VARCHAR);
-      } else {
-        ps.setString(5, sev);
-      }
-      ps.setString(6, memo.getCreatedBy());
-      ps.setTimestamp(7, Timestamp.valueOf(ts));
-      ps.setString(8, memo.getStatus());
+    String sql = "INSERT INTO memos(memo_type, memo_title, memo_created, memo_detail) VALUES(?,?,?,?)";
+    try (Connection c = dataSource.getConnection()) {
+      PreparedStatement ps = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+      ps.setString(1, memo.getMemoType());
+      ps.setString(2, memo.getMemoTitle());
+      ps.setString(3, memo.getMemoCreated());
+      ps.setString(4, memo.getMemoDetail());
       ps.executeUpdate();
-      try (ResultSet keys = ps.getGeneratedKeys()) {
-        if (keys.next()) memo.setId(keys.getInt(1));
+      try (ResultSet keys = ps.getGeneratedKeys()) { if (keys.next()) memo.setId(keys.getInt(1)); }
+      // link to class
+      if (classId > 0) {
+        try (PreparedStatement link = c.prepareStatement("INSERT INTO class_memo(class_id, memo_id) VALUES(?,?)")) {
+          link.setInt(1, classId);
+          link.setInt(2, memo.getId());
+          link.executeUpdate();
+        }
       }
-      memo.setClassId(classId);
-      memo.setCreatedAt(ts);
+      ps.close();
       return memo;
     } catch (SQLException e) {
-      if (isTableMissing(e)) throw new SchemaMissingException(e);
-      throw new RuntimeException(e);
-    }
-  }
-
-  public boolean closeMemo(int classId, int memoId) {
-    String sql = "UPDATE memos SET status='closed' WHERE class_id=? AND id=?";
-    try (Connection c = dataSource.getConnection();
-         PreparedStatement ps = c.prepareStatement(sql)) {
-      ps.setInt(1, classId);
-      ps.setInt(2, memoId);
-      int updated = ps.executeUpdate();
-      return updated > 0;
-    } catch (SQLException e) {
-      if (isTableMissing(e)) throw new SchemaMissingException(e);
-      throw new RuntimeException(e);
-    }
-  }
-
-  public long countOpenBugs(int classId) {
-    String sql = "SELECT COUNT(*) FROM memos WHERE class_id=? AND type='bug' AND status='open'";
-    try (Connection c = dataSource.getConnection();
-         PreparedStatement ps = c.prepareStatement(sql)) {
-      ps.setInt(1, classId);
-      try (ResultSet rs = ps.executeQuery()) {
-        if (rs.next()) return rs.getLong(1);
-        return 0L;
+      if (isColumnMissing(e)) {
+        String old = "INSERT INTO memos(memo_type, memo_title, memo_created) VALUES(?,?,?)";
+        try (Connection c = dataSource.getConnection()) {
+          PreparedStatement ps = c.prepareStatement(old, Statement.RETURN_GENERATED_KEYS);
+          ps.setString(1, memo.getMemoType());
+          ps.setString(2, memo.getMemoTitle());
+          ps.setString(3, memo.getMemoCreated());
+          ps.executeUpdate();
+          try (ResultSet keys = ps.getGeneratedKeys()) { if (keys.next()) memo.setId(keys.getInt(1)); }
+          if (classId > 0) {
+            try (PreparedStatement link = c.prepareStatement("INSERT INTO class_memo(class_id, memo_id) VALUES(?,?)")) {
+              link.setInt(1, classId);
+              link.setInt(2, memo.getId());
+              link.executeUpdate();
+            }
+          }
+          return memo;
+        } catch (SQLException ex) { if (isTableMissing(ex)) throw new SchemaMissingException(ex); throw new RuntimeException(ex); }
       }
-    } catch (SQLException e) { throw new RuntimeException(e); }
+      if (isTableMissing(e)) throw new SchemaMissingException(e); throw new RuntimeException(e);
+    }
   }
+
+  public boolean updateMemo(int unused, Memo memo) {
+    String sql = "UPDATE memos SET memo_type=?, memo_title=?, memo_created=?, memo_detail=? WHERE memo_id=?";
+    try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+      ps.setString(1, memo.getMemoType());
+      ps.setString(2, memo.getMemoTitle());
+      ps.setString(3, memo.getMemoCreated());
+      ps.setString(4, memo.getMemoDetail());
+      ps.setInt(5, memo.getId());
+      return ps.executeUpdate() > 0;
+    } catch (SQLException e) {
+      if (isColumnMissing(e)) {
+        String old = "UPDATE memos SET memo_type=?, memo_title=?, memo_created=? WHERE memo_id=?";
+        try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(old)) {
+          ps.setString(1, memo.getMemoType());
+          ps.setString(2, memo.getMemoTitle());
+          ps.setString(3, memo.getMemoCreated());
+          ps.setInt(4, memo.getId());
+          return ps.executeUpdate() > 0;
+        } catch (SQLException ex) { if (isTableMissing(ex)) throw new SchemaMissingException(ex); throw new RuntimeException(ex); }
+      }
+      if (isTableMissing(e)) throw new SchemaMissingException(e); throw new RuntimeException(e);
+    }
+  }
+
+  public boolean deleteMemo(int unused, int memoId) {
+    String sql1 = "DELETE FROM class_memo WHERE memo_id=?";
+    String sql2 = "DELETE FROM memos WHERE memo_id=?";
+    try (Connection c = dataSource.getConnection()) {
+      try (PreparedStatement ps1 = c.prepareStatement(sql1)) { ps1.setInt(1, memoId); ps1.executeUpdate(); }
+      try (PreparedStatement ps2 = c.prepareStatement(sql2)) { ps2.setInt(1, memoId); return ps2.executeUpdate() > 0; }
+    } catch (SQLException e) { if (isTableMissing(e)) throw new SchemaMissingException(e); throw new RuntimeException(e); }
+  }
+
+  public Memo findMemo(int memoId) {
+    String sql = "SELECT memo_id, memo_type, memo_title, memo_created, memo_detail FROM memos WHERE memo_id=?";
+    try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+      ps.setInt(1, memoId);
+      try (ResultSet rs = ps.executeQuery()) { if (rs.next()) return mapMemo(rs, true); return null; }
+    } catch (SQLException e) {
+      if (isColumnMissing(e)) {
+        String old = "SELECT memo_id, memo_type, memo_title, memo_created FROM memos WHERE memo_id=?";
+        try (Connection c = dataSource.getConnection(); PreparedStatement ps = c.prepareStatement(old)) {
+          ps.setInt(1, memoId);
+          try (ResultSet rs = ps.executeQuery()) { if (rs.next()) return mapMemo(rs, false); return null; }
+        } catch (SQLException ex) { if (isTableMissing(ex)) throw new SchemaMissingException(ex); throw new RuntimeException(ex); }
+      }
+      if (isTableMissing(e)) throw new SchemaMissingException(e); throw new RuntimeException(e);
+    }
+  }
+
+  public boolean closeMemo(int classId, int memoId) { return false; }
+  public long countOpenBugs(int classId) { return 0L; }
 
   private static ClassEntry mapClass(ResultSet rs) throws SQLException {
-    int id = rs.getInt("id");
-    String pkg = rs.getString("package_name");
+    int id = rs.getInt("class_id");
     String cls = rs.getString("class_name");
-    String author = rs.getString("author");
+    String created = rs.getString("class_created");
     String status = rs.getString("status");
-    int progress = rs.getInt("progress");
-    Date d = rs.getDate("last_updated");
-    LocalDate last = d != null ? d.toLocalDate() : LocalDate.now();
-    return new ClassEntry(id, pkg, cls, author, status, progress, last);
+    return new ClassEntry(id, cls, created, status);
   }
 
-  private static Memo mapMemo(ResultSet rs) throws SQLException {
-    int id = rs.getInt("id");
-    int classId = rs.getInt("class_id");
-    String type = rs.getString("type");
-    String title = rs.getString("title");
-    String body = rs.getString("body");
-    String severity = rs.getString("severity");
-    String createdBy = rs.getString("created_by");
-    Timestamp ts = rs.getTimestamp("created_at");
-    LocalDateTime at = ts != null ? ts.toLocalDateTime() : LocalDateTime.now();
-    String status = rs.getString("status");
-    return new Memo(id, classId, type, title, body, severity, createdBy, at, status);
+  private static Memo mapMemo(ResultSet rs, boolean hasDetail) throws SQLException {
+    int id = rs.getInt("memo_id");
+    String type = rs.getString("memo_type");
+    String title = rs.getString("memo_title");
+    String created = rs.getString("memo_created");
+    String detail = hasDetail ? rs.getString("memo_detail") : null;
+    return new Memo(id, type, title, created, detail);
   }
 
   private static boolean isTableMissing(SQLException e) {
-    // MySQL/MariaDB: errorCode 1146, SQLState 42S02
     if ("42S02".equals(e.getSQLState())) return true;
     if (e.getErrorCode() == 1146) return true;
-    // Unwrap causes if any
     Throwable t = e.getCause();
     while (t instanceof SQLException) {
       SQLException se = (SQLException) t;
       if ("42S02".equals(se.getSQLState()) || se.getErrorCode() == 1146) return true;
+      t = se.getCause();
+    }
+    return false;
+  }
+
+  private static boolean isColumnMissing(SQLException e) {
+    // Unknown column: SQLSTATE 42S22, MySQL error code 1054
+    if ("42S22".equals(e.getSQLState())) return true;
+    if (e.getErrorCode() == 1054) return true;
+    Throwable t = e.getCause();
+    while (t instanceof SQLException) {
+      SQLException se = (SQLException) t;
+      if ("42S22".equals(se.getSQLState()) || se.getErrorCode() == 1054) return true;
       t = se.getCause();
     }
     return false;

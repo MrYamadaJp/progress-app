@@ -61,16 +61,12 @@ public class ClassDetailServlet extends HttpServlet {
         ? ((JdbcStore) store).findClass(id)
         : ((InMemoryStore) store).findClass(id);
     if (clazz == null) { resp.sendError(HttpServletResponse.SC_NOT_FOUND); return; }
-    List<Memo> memos;
-    try {
-      memos = (store instanceof JdbcStore)
-          ? ((JdbcStore) store).listMemos(id)
-          : ((InMemoryStore) store).listMemos(id);
-    } catch (com.example.progress.repository.SchemaMissingException ex) {
-      resp.sendRedirect(req.getContextPath() + "/classes?warning=schema");
-      return;
-    }
     req.setAttribute("clazz", clazz);
+    // Add memos list to render below the class card (independent memos stack)
+    java.util.List<com.example.progress.model.Memo> memos =
+        (store instanceof JdbcStore)
+            ? ((JdbcStore) store).listMemos(id)
+            : ((InMemoryStore) store).listMemos(id);
     req.setAttribute("memos", memos);
     RequestDispatcher rd = req.getRequestDispatcher("/detail.jsp");
     rd.forward(req, resp);
@@ -88,43 +84,16 @@ public class ClassDetailServlet extends HttpServlet {
       }
     }
     String action = req.getParameter("action");
-    if ("add_memo".equals(action)) {
-      String type = param(req, "type", "note");
-      String title = param(req, "title", "");
-      String body = param(req, "body", "");
-      String severity = param(req, "severity", null);
-      String createdBy = param(req, "createdBy", "");
-      if (!title.isEmpty()) {
-        Memo m = new Memo(0, id, type, title, body, severity, createdBy, LocalDateTime.now(), "open");
-        try {
-          if (store instanceof JdbcStore) {
-            ((JdbcStore) store).addMemo(id, m);
-          } else {
-            ((InMemoryStore) store).addMemo(id, m);
-          }
-        } catch (com.example.progress.repository.SchemaMissingException ex) {
-          resp.sendRedirect(req.getContextPath() + "/classes?warning=schema");
-          return;
-        }
-      }
-      resp.sendRedirect(req.getRequestURI());
-      return;
-    }
-    if ("close_memo".equals(action)) {
+    // memo operations removed: memos are independent screens now
+    if ("delete_class".equals(action)) {
       try {
-        int memoId = Integer.parseInt(req.getParameter("memoId"));
-        try {
-          if (store instanceof JdbcStore) {
-            ((JdbcStore) store).closeMemo(id, memoId);
-          } else {
-            ((InMemoryStore) store).closeMemo(id, memoId);
-          }
-        } catch (com.example.progress.repository.SchemaMissingException ex) {
-          resp.sendRedirect(req.getContextPath() + "/classes?warning=schema");
-          return;
+        if (store instanceof JdbcStore) {
+          ((JdbcStore) store).deleteClass(id);
+        } else {
+          ((InMemoryStore) store).deleteClass(id);
         }
       } catch (Exception ignored) {}
-      resp.sendRedirect(req.getRequestURI());
+      resp.sendRedirect(req.getContextPath() + "/classes");
       return;
     }
     resp.sendError(HttpServletResponse.SC_BAD_REQUEST);

@@ -1,93 +1,81 @@
-Project Notes (進捗管理アプリ)
+Project Notes（進捗管理アプリ）
 
 概要
-- 小規模チーム向けの「クラス別の進捗とメモ（note/bug）管理」Webアプリ。
-- 当面はシンプルな機能で動くことを重視し、JDBCによる永続化に対応。
+- 小規模チーム向け「クラス別進捗とメモ」の管理アプリ（JSP/Servlet）。
+- JDBC（MariaDB/MySQL）で永続化／JNDI DataSource。未設定時はメモリ実装で動作。
 
 技術スタック
-- Java 17 / Servlet 4.0（javax.*）
-- JSP + JSTL 1.2
+- Java 17 / Servlet 4（javax.*）/ JSP + JSTL 1.2
 - Maven（WAR）/ Tomcat 9
-- DB: MariaDB/MySQL（HeidiSQL で管理）
+- DB: MariaDB/MySQL（HeidiSQL 等で管理）
 
-モジュール/構成
-- モジュール: progress-app（WAR）
-- パッケージ:
-  - model: ClassEntry, Memo
-  - repository: InMemoryStore（メモリ実装）, JdbcStore（JDBC実装）, SchemaMissingException
-  - web: ClassListServlet（一覧）, ClassDetailServlet（詳細/POST）, CharsetFilter（UTF-8）
-- Web資産: index.jsp, list.jsp, detail.jsp, WEB-INF/web.xml, META-INF/context.xml（JNDI定義）
+構成（主なパッケージ/ファイル）
+- model: ClassEntry, Memo（memoDetail あり）
+- repository: InMemoryStore（クラス⇄メモ関連）, JdbcStore（memo_detail / class_memo 対応）, SchemaMissingException
+- web: ClassListServlet, ClassDetailServlet, ClassEditServlet, ClassDeleteServlet,
+       MemoListServlet（一覧廃止→/classesへリダイレクト）, MemoManageServlet（新規/編集/削除）, CharsetFilter,
+       AuthFilter（認証保護）, LoginServlet, LogoutServlet, HealthServlet
+- webapp: index.jsp（ログイン/メニュー）, list.jsp（カードUI）, detail.jsp（クラス＋メモ統合表示）, class_* / memo_* JSP,
+          assets/app.css, assets/app.js
 
-データベース
-- 代表的スキーマ（実運用中）
-  - DB名: taskall（環境により変更可）
-  - テーブル: classes, memos（DDL は下記）
-- JNDI DataSource（ローカル例: META-INF/context.xml）
-  - name: jdbc/progress
-  - url: jdbc:mariadb://localhost:3306/taskall?useUnicode=true&amp;characterEncoding=utf8&amp;serverTimezone=UTC
-  - username/password: 環境に合わせて設定（例: progress/progresspw）
-- web.xml に resource-ref を定義済み（jdbc/progress）。
+実装状況（2025-09-07）
+- ログイン認証（セッション式）
+  - index.jsp からログイン。AuthFilter で全ページ保護（/assets, /, /index.jsp, /login, /logout を除外）。
+  - 認証情報は環境変数 AUTH_USER/AUTH_PASS を優先。未設定時は web.xml の管理者（admin/changeit）。
+- 画面
+  - 一覧（/classes）: テーブル→カードUIに刷新（詳細/更新/削除のボタン）。
+  - 詳細（/classes/{id}）: クラス情報カード＋メモ一覧（上帯=type/title/created、下枠=detail）。
+  - メモ（/memo/new|edit|delete）: back パラメータでクラス詳細に戻る。フォーム action を固定し動作安定化。
+  - 共通CSS/JS: カード/ボタン、確認ダイアログ（data-confirm）、スムーズスクロール。
+- メモのクラス紐付け（重要）
+  - InMemory: classId→memoId のマップを保持。listMemos(classId)、addMemo(classId, m)、deleteMemo(classId, id)。
+  - JDBC: class_memo でクラス⇄メモを関連。memo_detail 列に対応（列未追加時はフォールバック）。
+- 健康監視: /healthz（DB OKで ok）。
+- セッション: session-timeout=120、HttpOnly クッキー、cookie-config/tracking-mode のスキーマ順に整備。
 
-実装済み機能
-- クラス一覧（GET /classes）
-  - パッケージ名→クラス名でソートし、ID/パッケージ/クラス名/作成者/ステータス/進捗(%) を表示。
-  - DB接続（JNDI）成功時は JDBC 経由で取得。JNDI未設定時はメモリにフォールバック。
-  - テーブル未作成/権限不足に相当する場合、一覧上部に警告を表示。
-- クラス詳細（GET /classes/{id}）
-  - クラス情報とメモ一覧（note/bug）を表示。
-  - メモ追加（POST /classes/{id}、action=add_memo）: severity が空なら NULL 保存。
-  - メモクローズ（POST /classes/{id}、action=close_memo）。
-- 文字コード対策: CharsetFilter を導入し、JSP は pageEncoding=UTF-8。フォームには accept-charset を付与。
-
-未実装/今後の拡張
-- 進捗更新（一覧のセレクトから progress を更新、last_updated も更新）。
-- クラスの追加/編集/削除 UI。
-- 入力バリデーションとエラー表示（メモ/クラス）。
-- バグ件数表示（countOpenBugs の UI 反映）。
-- SLF4J バインダの追加（警告抑止、例: slf4j-jdk14）。
-- Jakarta EE 版への将来移行（javax.* → jakarta.*）。
-- 単体テスト/簡易ITの追加。
-
-ビルド/デプロイ
-- Maven: mvn -q -DskipTests package → target/progress-app-0.0.1-SNAPSHOT.war
-- Tomcat への配置（手動）: webapps へ WAR を配置（再配備時は展開済みフォルダを削除）。
-- Eclipse（WTP）での配備:
-  - Server Locations: Use workspace metadata（推奨）。
-  - Servers ビューで Clean → Publish → Start/Restart。
-  - Modules の Path が progress-app なら URL は http://localhost:8080/progress-app/（ROOT配備時は http://localhost:8080/）。
-  - 配備先（例）: ＜workspace＞/.metadata/.plugins/org.eclipse.wst.server.core/tmpX/wtpwebapps/progress-app
-
-DBスキーマ（DDL）
+DB スキーマ（運用版）
 CREATE TABLE classes (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  package_name VARCHAR(255) NOT NULL,
-  class_name   VARCHAR(255) NOT NULL,
-  author       VARCHAR(100) NOT NULL,
-  status       ENUM('todo','doing','done') NOT NULL DEFAULT 'todo',
-  progress     TINYINT NOT NULL DEFAULT 0,
-  last_updated DATE NOT NULL,
-  UNIQUE KEY uq_class (package_name, class_name)
+  class_id INT AUTO_INCREMENT PRIMARY KEY,
+  class_name VARCHAR(255) NOT NULL,
+  class_created VARCHAR(100) NOT NULL,
+  status TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE memos (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  class_id   INT NOT NULL,
-  type       ENUM('note','bug') NOT NULL,
-  title      VARCHAR(255) NOT NULL,
-  body       TEXT,
-  severity   ENUM('low','mid','high') NULL,
-  created_by VARCHAR(100),
-  created_at DATETIME NOT NULL,
-  status     ENUM('open','closed') NOT NULL DEFAULT 'open',
-  CONSTRAINT fk_memo_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
-  KEY idx_memos_class_status (class_id, status)
+  memo_id INT AUTO_INCREMENT PRIMARY KEY,
+  memo_type TEXT NOT NULL,
+  memo_title VARCHAR(255) NOT NULL,
+  memo_created VARCHAR(100),
+  memo_detail TEXT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-既知の注意点
-- 最初に DB 接続が権限不足/テーブル未作成だと一覧に警告を出す（SchemaMissingException を捕捉）。
-- SLF4J: 「No providers」警告は機能影響なし。必要なら slf4j-jdk14 追加で抑止可能。
-- Eclipse で「複数のコンテキストに '/progress-app'」が出る場合は、重複配備（インストール側/ワークスペース側）を整理し、Clean/Publish で再配備。
+CREATE TABLE class_memo (
+  class_id INT NOT NULL,
+  memo_id  INT NOT NULL,
+  PRIMARY KEY (class_id, memo_id),
+  CONSTRAINT fk_cm_class FOREIGN KEY (class_id) REFERENCES classes(class_id) ON DELETE CASCADE,
+  CONSTRAINT fk_cm_memo  FOREIGN KEY (memo_id)  REFERENCES memos(memo_id)  ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-メモ
-- 現在は DB: taskall（JNDI で jdbc/progress を参照）。環境により DB 名/資格情報は変更可。
-- URL の & は context.xml 内では &amp; にエスケープすること。
+JNDI（ローカル開発例）
+- META-INF/context.xml:
+  - name: jdbc/progress
+  - url: jdbc:mariadb://localhost:3306/taskall?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+  - username/password: 環境に合わせて設定
+
+ビルド/デプロイ
+- Maven: mvn -q -DskipTests package → target/progress-app-0.0.1-SNAPSHOT.war
+- Tomcat9: webapps/progress-app.war へ配置 → 自動展開。
+- 認証（本番）: AUTH_USER / AUTH_PASS（環境変数）で上書き。
+- 監視: /healthz（ヘルスチェックに使用）。
+- Raspberry Pi/systemd 例: DEPLOY_PI.md を参照。
+
+既知の注意点
+- Tomcat 10（jakarta.*）では不可。Tomcat 9（javax.*）必須。
+- web.xml の session-config は「cookie-config → tracking-mode」の順。cookie-config は「name→http-only→secure」。
+- DB テーブル未作成時はフォールバック動作（一覧に警告 or 全メモ）。運用では DDL を必ず適用。
+
+今後の候補
+- HTTPS 化（nginx 経由）と Secure/SameSite クッキー運用。
+- 入力バリデーションとエラーメッセージ整備。
+- 検索/ソート/ページネーション（クラス/メモ）。

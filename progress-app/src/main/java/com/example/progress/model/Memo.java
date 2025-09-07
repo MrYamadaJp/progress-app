@@ -1,48 +1,36 @@
 package com.example.progress.model;
 
-import java.time.LocalDateTime;
-
 public class Memo {
-  private int id;
-  private int classId;
-  private String type;       // note | bug
-  private String title;
-  private String body;
-  private String severity;   // optional (for bug)
-  private String createdBy;
-  private LocalDateTime createdAt;
-  private String status;     // open | closed
+  private int memoId;
+  private String memoType;     // TEXT
+  private String memoTitle;
+  private String memoCreated;  // 作成者など
+  private String memoDetail;   // 本文詳細（任意）
 
-  public Memo(int id, int classId, String type, String title, String body,
-              String severity, String createdBy, LocalDateTime createdAt, String status) {
-    this.id = id;
-    this.classId = classId;
-    this.type = type;
-    this.title = title;
-    this.body = body;
-    this.severity = severity;
-    this.createdBy = createdBy;
-    this.createdAt = createdAt;
-    this.status = status;
+  public Memo(int memoId, String memoType, String memoTitle, String memoCreated) {
+    this(memoId, memoType, memoTitle, memoCreated, null);
   }
 
-  public int getId() { return id; }
-  public int getClassId() { return classId; }
-  public String getType() { return type; }
-  public String getTitle() { return title; }
-  public String getBody() { return body; }
-  public String getSeverity() { return severity; }
-  public String getCreatedBy() { return createdBy; }
-  public LocalDateTime getCreatedAt() { return createdAt; }
-  public String getStatus() { return status; }
+  public Memo(int memoId, String memoType, String memoTitle, String memoCreated, String memoDetail) {
+    this.memoId = memoId;
+    this.memoType = memoType;
+    this.memoTitle = memoTitle;
+    this.memoCreated = memoCreated;
+    this.memoDetail = memoDetail;
+  }
 
-  public void setId(int id) { this.id = id; }
-  public void setClassId(int classId) { this.classId = classId; }
-  public void setType(String type) { this.type = type; }
-  public void setTitle(String title) { this.title = title; }
-  public void setBody(String body) { this.body = body; }
-  public void setSeverity(String severity) { this.severity = severity; }
-  public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
-  public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-  public void setStatus(String status) { this.status = status; }
+  public int getId() { return memoId; }
+  public int getMemoId() { return memoId; }
+  public String getMemoType() { return memoType; }
+  public String getMemoTitle() { return memoTitle; }
+  public String getMemoCreated() { return memoCreated; }
+  public String getMemoDetail() { return memoDetail; }
+
+  public void setId(int memoId) { this.memoId = memoId; }
+  public void setMemoId(int memoId) { this.memoId = memoId; }
+  public void setMemoType(String memoType) { this.memoType = memoType; }
+  public void setMemoTitle(String memoTitle) { this.memoTitle = memoTitle; }
+  public void setMemoCreated(String memoCreated) { this.memoCreated = memoCreated; }
+  public void setMemoDetail(String memoDetail) { this.memoDetail = memoDetail; }
 }
+

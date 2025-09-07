@@ -1,40 +1,27 @@
 package com.example.progress.model;
 
-import java.time.LocalDate;
-
 public class ClassEntry {
-  private int id;
-  private String packageName;
+  private int classId;
   private String className;
-  private String author;
-  private String status;   // todo / doing / done
-  private int progress;    // 0-100
-  private LocalDate lastUpdated;
+  private String classCreated; // 作成者（created_by 相当）
+  private String status;       // TEXT
 
-  public ClassEntry(int id, String packageName, String className, String author,
-                    String status, int progress, LocalDate lastUpdated) {
-    this.id = id;
-    this.packageName = packageName;
+  public ClassEntry(int classId, String className, String classCreated, String status) {
+    this.classId = classId;
     this.className = className;
-    this.author = author;
+    this.classCreated = classCreated;
     this.status = status;
-    this.progress = progress;
-    this.lastUpdated = lastUpdated;
   }
 
-  public int getId() { return id; }
-  public String getPackageName() { return packageName; }
+  public int getId() { return classId; }
+  public int getClassId() { return classId; }
   public String getClassName() { return className; }
-  public String getAuthor() { return author; }
+  public String getClassCreated() { return classCreated; }
   public String getStatus() { return status; }
-  public int getProgress() { return progress; }
-  public LocalDate getLastUpdated() { return lastUpdated; }
 
-  public void setId(int id) { this.id = id; }
-  public void setPackageName(String packageName) { this.packageName = packageName; }
+  public void setId(int classId) { this.classId = classId; }
+  public void setClassId(int classId) { this.classId = classId; }
   public void setClassName(String className) { this.className = className; }
-  public void setAuthor(String author) { this.author = author; }
+  public void setClassCreated(String classCreated) { this.classCreated = classCreated; }
   public void setStatus(String status) { this.status = status; }
-  public void setProgress(int progress) { this.progress = progress; }
-  public void setLastUpdated(LocalDate lastUpdated) { this.lastUpdated = lastUpdated; }
 }
