@@ -1,0 +1,62 @@
+<%@ page pageEncoding="UTF-8" contentType="text/html; charset=UTF-8" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>繧ｯ繝ｩ繧ｹ荳隕ｧ</title>
+  <style>
+    body{font-family:sans-serif;margin:24px}
+    table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #ccc;padding:8px;text-align:left}
+    th{background:#f7f7f7}
+    .warn{background:#fff3cd;border:1px solid #ffeeba;color:#856404;padding:10px;margin-bottom:16px}
+  </style>
+</head>
+<body>
+  <h1>繧ｯ繝ｩ繧ｹ荳隕ｧ</h1>
+  <c:if test="${not empty param.warning || not empty warning}">
+    <div class="warn">繝・・繧ｿ繝吶・繧ｹ縺ｫ蠢・ｦ√↑繝・・繝悶Ν(classes, memos)縺瑚ｦ九▽縺九ｊ縺ｾ縺帙ｓ縲・eidiSQL縺ｧDDL繧貞ｮ溯｡後＠縺ｦ縺上□縺輔＞縲・/div>
+  </c:if>
+  <p>
+    <a href="<c:url value='/'/>">繝医ャ繝励∈謌ｻ繧・/a>
+    &nbsp;|&nbsp;
+    <a href="<c:url value='/classes/new'/>">譁ｰ隕上け繝ｩ繧ｹ縺ｮ菴懈・</a>
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>繧ｯ繝ｩ繧ｹ蜷・/th>
+        <th>菴懈・閠・/th>
+        <th>繧ｹ繝・・繧ｿ繧ｹ</th>
+        <th>騾ｲ謐・/th>
+        <th>隧ｳ邏ｰ</th>
+      </tr>
+    </thead>
+    <tbody>
+      <c:forEach var="c" items="${classes}">
+        <tr>
+          <td>${c.id}</td>
+          <td>${c.className}</td>
+          <td>${c.classCreated}</td>
+          <td>${c.status}</td>
+          <td>
+            <select name="progress" class="progress-select" data-class-id="${c.id}">
+              <!-- TODO: options to be provided by owner -->
+            </select>
+            ${c.progress}%
+          </td>
+          <td>
+            <a href="<c:url value='/classes/${c.id}'/>">隧ｳ邏ｰ</a>
+            &nbsp;|&nbsp;
+            <a href="<c:url value='/class/delete'><c:param name='id' value='${c.id}'/></c:url>">蜑企勁</a>
+          </td>
+        </tr>
+      </c:forEach>
+    </tbody>
+  </table>
+</body>
+</html>
+
